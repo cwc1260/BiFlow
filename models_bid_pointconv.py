@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torch.nn.functional as F
-from pointconv_util import PointConv, PointConvD, PointWarping, UpsampleFlow, CrossLayer
-from pointconv_util import SceneFlowEstimatorPointConv
+from pointconv_util import PointConv, PointConvD, PointWarping, UpsampleFlow, CrossLayerLight as CrossLayer
+from pointconv_util import SceneFlowEstimatorResidual
 from pointconv_util import index_points_gather as index_points, index_points_group, Conv1d, square_distance
 import time
 
@@ -21,35 +21,45 @@ class PointConvBidirection(nn.Module):
         #l0: 8192
         self.level0 = Conv1d(3, 32)
         self.level0_1 = Conv1d(32, 32)
+        # self.level0_1_t1 = Conv1d(32, 32)
+        # self.level0_1_t2 = Conv1d(32, 32)
         self.cross0 = CrossLayer(flow_nei, 32 + 32 , [32, 32], [32, 32])
-        self.flow0 = SceneFlowEstimatorPointConv(32 + 64, 32)
+        self.flow0 = SceneFlowEstimatorResidual(32 + 64, 32)
         self.level0_2 = Conv1d(32, 64)
 
         #l1: 2048
         self.level1 = PointConvD(2048, feat_nei, 64 + 3, 64)
         self.cross1 = CrossLayer(flow_nei, 64 + 32, [64, 64], [64, 64])
-        self.flow1 = SceneFlowEstimatorPointConv(64 + 64, 64)
+        self.flow1 = SceneFlowEstimatorResidual(64 + 64, 64)
         self.level1_0 = Conv1d(64, 64)
+        # self.level1_0_t1 = Conv1d(64, 64)
+        # self.level1_0_t2 = Conv1d(64, 64)
         self.level1_1 = Conv1d(64, 128)
 
         #l2: 512
         self.level2 = PointConvD(512, feat_nei, 128 + 3, 128)
         self.cross2 = CrossLayer(flow_nei, 128 + 64, [128, 128], [128, 128])
-        self.flow2 = SceneFlowEstimatorPointConv(128 + 64, 128)
+        self.flow2 = SceneFlowEstimatorResidual(128 + 64, 128)
         self.level2_0 = Conv1d(128, 128)
+        # self.level2_0_t1 = Conv1d(128, 128)
+        # self.level2_0_t2 = Conv1d(128, 128)
         self.level2_1 = Conv1d(128, 256)
 
         #l3: 256
         self.level3 = PointConvD(256, feat_nei, 256 + 3, 256)
         self.cross3 = CrossLayer(flow_nei, 256 + 64, [256, 256], [256, 256])
-        self.flow3 = SceneFlowEstimatorPointConv(256, 256, flow_ch=0)
+        self.flow3 = SceneFlowEstimatorResidual(256, 256)
         self.level3_0 = Conv1d(256, 256)
+        # self.level3_0_t1 = Conv1d(256, 256)
+        # self.level3_0_t2 = Conv1d(256, 256)
         self.level3_1 = Conv1d(256, 512)
 
         #l4: 64
         self.level4 = PointConvD(64, feat_nei, 512 + 3, 256)
 
         #deconv
+        # self.deconv4_3_t1 = Conv1d(256, 64)
+        # self.deconv4_3_t2 = Conv1d(256, 64)
         self.deconv4_3 = Conv1d(256, 64)
         self.deconv3_2 = Conv1d(256, 64)
         self.deconv2_1 = Conv1d(128, 32)
@@ -72,47 +82,57 @@ class PointConvBidirection(nn.Module):
         color1 = color1.permute(0, 2, 1) # B 3 N
         color2 = color2.permute(0, 2, 1) # B 3 N
         feat1_l0 = self.level0(color1)
+        # feat1_l0 = self.level0_1_t1(feat1_l0)
         feat1_l0 = self.level0_1(feat1_l0)
         feat1_l0_1 = self.level0_2(feat1_l0)
 
         feat2_l0 = self.level0(color2)
+        # feat2_l0 = self.level0_1_t2(feat2_l0)
         feat2_l0 = self.level0_1(feat2_l0)
         feat2_l0_1 = self.level0_2(feat2_l0)
 
         #l1
         pc1_l1, feat1_l1, fps_pc1_l1 = self.level1(pc1_l0, feat1_l0_1)
-        feat1_l1_2 = self.level1_0(feat1_l1)
-        feat1_l1_2 = self.level1_1(feat1_l1_2)
+        # feat1_l1 = self.level1_0_t1(feat1_l1)
+        feat1_l1 = self.level1_0(feat1_l1)
+        feat1_l1_2 = self.level1_1(feat1_l1)
 
         pc2_l1, feat2_l1, fps_pc2_l1 = self.level1(pc2_l0, feat2_l0_1)
-        feat2_l1_2 = self.level1_0(feat2_l1)
-        feat2_l1_2 = self.level1_1(feat2_l1_2)
+        # feat2_l1 = self.level1_0_t2(feat2_l1)
+        feat2_l1 = self.level1_0(feat2_l1)
+        feat2_l1_2 = self.level1_1(feat2_l1)
 
         #l2
         pc1_l2, feat1_l2, fps_pc1_l2 = self.level2(pc1_l1, feat1_l1_2)
-        feat1_l2_3 = self.level2_0(feat1_l2)
-        feat1_l2_3 = self.level2_1(feat1_l2_3)
+        # feat1_l2 = self.level2_0_t1(feat1_l2)
+        feat1_l2 = self.level2_0(feat1_l2)
+        feat1_l2_3 = self.level2_1(feat1_l2)
 
         pc2_l2, feat2_l2, fps_pc2_l2 = self.level2(pc2_l1, feat2_l1_2)
-        feat2_l2_3 = self.level2_0(feat2_l2)
-        feat2_l2_3 = self.level2_1(feat2_l2_3)
+        # feat2_l2 = self.level2_0_t2(feat2_l2)
+        feat2_l2 = self.level2_0(feat2_l2)
+        feat2_l2_3 = self.level2_1(feat2_l2)
 
         #l3
         pc1_l3, feat1_l3, fps_pc1_l3 = self.level3(pc1_l2, feat1_l2_3)
-        feat1_l3_4 = self.level3_0(feat1_l3)
-        feat1_l3_4 = self.level3_1(feat1_l3_4)
+        # feat1_l3 = self.level3_0_t1(feat1_l3)
+        feat1_l3 = self.level3_0(feat1_l3)
+        feat1_l3_4 = self.level3_1(feat1_l3)
 
         pc2_l3, feat2_l3, fps_pc2_l3 = self.level3(pc2_l2, feat2_l2_3)
-        feat2_l3_4 = self.level3_0(feat2_l3)
-        feat2_l3_4 = self.level3_1(feat2_l3_4)
+        # feat2_l3 = self.level3_0_t2(feat2_l3)
+        feat2_l3 = self.level3_0(feat2_l3)
+        feat2_l3_4 = self.level3_1(feat2_l3)
 
         #l4
         pc1_l4, feat1_l4, _ = self.level4(pc1_l3, feat1_l3_4)
         feat1_l4_3 = self.upsample(pc1_l3, pc1_l4, feat1_l4)
+        # feat1_l4_3 = self.deconv4_3_t1(feat1_l4_3)
         feat1_l4_3 = self.deconv4_3(feat1_l4_3)
 
         pc2_l4, feat2_l4, _ = self.level4(pc2_l3, feat2_l3_4)
         feat2_l4_3 = self.upsample(pc2_l3, pc2_l4, feat2_l4)
+        # feat2_l4_3 = self.deconv4_3_t2(feat2_l4_3)
         feat2_l4_3 = self.deconv4_3(feat2_l4_3)
 
         #l3
@@ -322,13 +342,24 @@ from thop import profile, clever_format
 if __name__ == '__main__':
     import os
     import torch
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     input = torch.randn((1,8192,3)).float().cuda()
-    model = PointConvSceneFlowPWC8192selfglobalPointConv().cuda()
-    # output = model(input,input,input,input)
-    # macs, params = profile(model, inputs=(input,input,input,input))
-    # macs, params = clever_format([macs, params], "%.3f")
-    # print(macs, params)
+    model = PointConvBidirection().cuda()
+    # print(model)
+    output = model(input,input,input,input)
+    macs, params = profile(model, inputs=(input,input,input,input))
+    macs, params = clever_format([macs, params], "%.3f")
+    print(macs, params)
     total = sum([param.nelement() for param in model.parameters()])
     print("Number of parameter: %.2fM" % (total/1e6))
 
+    dump_input = torch.randn((1,8192,3)).float().cuda()
+    traced_model = torch.jit.trace(model, (dump_input, dump_input, dump_input, dump_input))
+    timer = 0
+
+    timer = 0
+    for i in range(100):
+        t = time.time()
+        _ = traced_model(input,input,input,input)
+        timer += time.time() - t
+    print(timer / 100.0)
