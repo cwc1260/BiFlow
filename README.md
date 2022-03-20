@@ -47,31 +47,20 @@ python3 data_preprocess/process_kitti.py RAW_DATA_PATH SAVE_PATH/KITTI_processed
 ### Evaluation
 Set `data_root` in the configuration file to `SAVE_PATH` in the data preprocess section before evaluation. 
 
-We provide two pretrained model in ```pretrain_weights```.
-They are PointConv and Separable folders that represent the bidirectional model with PointConv layers and the model with Separable point set convolution layers, respectively.
-Please run the following instrcutions for evaluating them.
-* Bidirectional model with PointConv layers
+We provide pretrained model in ```pretrain_weights```.
+
+Please run the following instrcutions for evaluating.
 ```bash
 python3 evaluate_bid_pointconv.py config_evaluate_bid_pointconv.yaml
-```
-
-* Bidirectional model with Separable point set convolution layers
-```bash
-python3 evaluate_bid_separable.py config_evaluate_bid_separable.yaml
 ```
 
 ### Train
 If you need a newly trained model, please set `data_root` in the configuration file to `SAVE_PATH` in the data preprocess section before evaluation at the first. Then excute following instructions.
 
-* Bidirectional model with PointConv layers
 ```bash
 python3 train_bid_pointconv.py config_train_bid_pointconv.yaml
 ```
 
-* Bidirectional model with Separable point set convolution layers
-```bash
-python3 train_bid_separable.py config_train_bid_separable.yaml
-```
 
 ## Acknowledgement
 
