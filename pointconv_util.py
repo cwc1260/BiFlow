@@ -29,6 +29,25 @@ class Conv1d(nn.Module):
         x = self.composed_module(x)
         return x
 
+class Conv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, use_leaky=True, bn=use_bn, bias=True):
+        super(Conv2d, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        relu = nn.ReLU(inplace=True) if not use_leaky else nn.LeakyReLU(LEAKY_RATE, inplace=True)
+
+        self.composed_module = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias),
+            nn.BatchNorm2d(out_channels) if bn else nn.Identity(),
+            relu
+        )
+
+    def forward(self, x):
+        x = self.composed_module(x)
+        return x
+    
+    
 def square_distance(src, dst):
     """
     Calculate Euclid distance between each two points.
