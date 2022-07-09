@@ -1,4 +1,5 @@
-# Bi-PointFlowNet
+# Bi-PointFlowNet:Bidirectional Learning for Point Cloud Based Scene Flow Estimation
+Wencan Cheng and Jong Hwan Ko
 
 ## Prerequisities
 Our model is trained and tested under:
